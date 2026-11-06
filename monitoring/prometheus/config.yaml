@@ -1,0 +1,39 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 15s
+      evaluation_interval: 15s
+      scrape_timeout: 10s
+    rule_files:
+      - /etc/prometheus/alerts.yml
+    scrape_configs:
+      - job_name: prometheus
+        static_configs:
+          - targets: ['localhost:9090']
+      - job_name: telegraf
+        static_configs:
+          - targets: ['telegraf.observability.svc.cluster.local:9273']
+      # Static service targets survive Pod recreation: absent endpoints become up=0.
+      - job_name: apps
+        static_configs:
+          - targets: ['security.microservices.svc.cluster.local:8000']
+            labels: {service: security}
+          - targets: ['uploader.microservices.svc.cluster.local:8000']
+            labels: {service: uploader}
+  alerts.yml: |
+    groups:
+      - name: application-availability
+        interval: 15s
+        rules:
+          - alert: AppServiceDown
+            expr: up{job="apps"} == 0
+            for: 30s
+            labels:
+              severity: warning
+            annotations:
+              summary: 'Application metrics endpoint unavailable'
+              description: 'Prometheus cannot scrape {{ $labels.service }} at {{ $labels.instance }} for 30 seconds.'

@@ -1,0 +1,53 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: telegraf-config
+data:
+  telegraf.conf: |
+    [agent]
+      interval = "15s"
+      round_interval = true
+      flush_interval = "15s"
+      metric_buffer_limit = 5000
+      skip_processors_after_aggregators = true
+      hostname = "${NODE_NAME}"
+      omit_hostname = false
+
+    [[inputs.cpu]]
+      percpu = false
+      totalcpu = true
+      collect_cpu_time = false
+      report_active = true
+
+    [[inputs.mem]]
+
+    # Read the node's own kubelet over verified TLS. Fine-grained nodes/stats
+    # and nodes/pods permissions are needed for /stats/summary and /pods.
+    # Node filesystem and network metrics describe the host, not this Pod.
+    [[inputs.kubernetes]]
+      url = "https://${NODE_IP}:10250"
+      bearer_token = "/var/run/secrets/kubernetes.io/serviceaccount/token"
+      tls_ca = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
+      insecure_skip_verify = false
+      response_timeout = "10s"
+      label_exclude = ["*"]
+      namepass = ["kubernetes_node", "kubernetes_pod_container", "kubernetes_pod_network"]
+
+    # These real health checks also cover frontend, which has no /metrics.
+    [[inputs.http_response]]
+      urls = [
+        "http://frontend.microservices.svc.cluster.local:8080/healthz",
+        "http://security.microservices.svc.cluster.local:8000/health",
+        "http://uploader.microservices.svc.cluster.local:8000/health/ready"
+      ]
+      response_timeout = "5s"
+      response_status_code = 200
+      # Keep a stable time series across success/failure; result_code and
+      # http_response_code carry the current numeric result instead.
+      tagexclude = ["result", "status_code"]
+      fieldexclude = ["result_type"]
+
+    [[outputs.prometheus_client]]
+      listen = ":9273"
+      expiration_interval = "60s"
+      string_as_label = false

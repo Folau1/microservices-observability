@@ -1,0 +1,398 @@
+{
+  "uid": "microservices-business",
+  "title": "Business Dashboard",
+  "tags": [
+    "microservices",
+    "business"
+  ],
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": false,
+  "timezone": "browser",
+  "refresh": "30s",
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "templating": {
+    "list": []
+  },
+  "panels": [
+    {
+      "id": 21,
+      "title": "Успешные загрузки за период",
+      "type": "stat",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 8,
+        "h": 5
+      },
+      "description": "Оценка числа успешно сохранённых файлов за выбранный интервал по реальному счётчику Uploader. Счётчики сбрасываются при перезапуске Pod.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(increase(app_uploads_total[$__range]))",
+          "legendFormat": "",
+          "editorMode": "code",
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "blue"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      }
+    },
+    {
+      "id": 22,
+      "title": "Успешные запросы Uploader",
+      "type": "stat",
+      "gridPos": {
+        "x": 8,
+        "y": 0,
+        "w": 8,
+        "h": 5
+      },
+      "description": "Оценка числа ответов 2xx за выбранный интервал; это HTTP-запросы, а не уникальные пользователи.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(increase(app_http_requests_total{service=\"uploader\",status=~\"2..\"}[$__range])) or (sum(increase(app_http_requests_total{service=\"uploader\"}[$__range])) * 0)",
+          "legendFormat": "",
+          "editorMode": "code",
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "blue"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      }
+    },
+    {
+      "id": 23,
+      "title": "Неуспешные запросы Uploader",
+      "type": "stat",
+      "gridPos": {
+        "x": 16,
+        "y": 0,
+        "w": 8,
+        "h": 5
+      },
+      "description": "Оценка числа ответов 4xx и 5xx; включает проверки авторизации и другие ошибки клиента.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(increase(app_http_requests_total{service=\"uploader\",status=~\"4..|5..\"}[$__range])) or (sum(increase(app_http_requests_total{service=\"uploader\"}[$__range])) * 0)",
+          "legendFormat": "",
+          "editorMode": "code",
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "blue"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      }
+    },
+    {
+      "id": 24,
+      "title": "Загрузки файлов в секунду",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 0,
+        "y": 5,
+        "w": 12,
+        "h": 7
+      },
+      "description": "Скорость по счётчику успешно сохранённых файлов.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(app_uploads_total[5m]))",
+          "legendFormat": "Успешные загрузки",
+          "editorMode": "code",
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      }
+    },
+    {
+      "id": 25,
+      "title": "Ответы Uploader по коду",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 12,
+        "y": 5,
+        "w": 12,
+        "h": 7
+      },
+      "description": "Фактическая частота ответов Uploader по HTTP-кодам.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by(status) (rate(app_http_requests_total{service=\"uploader\"}[5m]))",
+          "legendFormat": "HTTP {{status}}",
+          "editorMode": "code",
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      }
+    },
+    {
+      "id": 26,
+      "title": "Время ответа Uploader p95 по маршруту",
+      "type": "timeseries",
+      "gridPos": {
+        "x": 0,
+        "y": 12,
+        "w": 12,
+        "h": 7
+      },
+      "description": "Оценка p95 из гистограмм. При редких запросах может быть мало данных.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum by(le,path) (rate(app_http_request_duration_seconds_bucket{service=\"uploader\"}[5m])))",
+          "legendFormat": "{{path}}",
+          "editorMode": "code",
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      }
+    },
+    {
+      "id": 27,
+      "title": "Готовность Uploader",
+      "type": "stat",
+      "gridPos": {
+        "x": 12,
+        "y": 12,
+        "w": 12,
+        "h": 7
+      },
+      "description": "HTTP 200 и успешное соединение для readiness Uploader, включая доступность MinIO; ошибка или другой статус — 0.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "min by(server) (((http_response_result_code{server=~\".*uploader.*\"} == bool 0) * (http_response_http_response_code{server=~\".*uploader.*\"} == bool 200)) or (http_response_result_code{server=~\".*uploader.*\"} * 0))",
+          "legendFormat": "{{server}}",
+          "editorMode": "code",
+          "range": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "Нет",
+                  "color": "red"
+                },
+                "1": {
+                  "text": "Да",
+                  "color": "green"
+                }
+              }
+            }
+          ]
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "auto",
+        "textMode": "auto",
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      }
+    }
+  ]
+}

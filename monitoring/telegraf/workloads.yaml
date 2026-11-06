@@ -1,0 +1,91 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: telegraf
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: observability-telegraf-kubelet
+rules:
+  - apiGroups: ['']
+    resources: ['nodes/stats', 'nodes/pods']
+    resourceNames: ['node2']
+    verbs: ['get']
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: observability-telegraf-kubelet
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: observability-telegraf-kubelet
+subjects:
+  - kind: ServiceAccount
+    name: telegraf
+    namespace: observability
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: telegraf
+spec:
+  selector:
+    matchLabels: {app: telegraf}
+  template:
+    metadata:
+      labels: {app: telegraf}
+    spec:
+      serviceAccountName: telegraf
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: telegraf
+          image: telegraf:1.40.2
+          args: ['--config', '/etc/telegraf/telegraf.conf']
+          env:
+            - name: NODE_IP
+              valueFrom: {fieldRef: {fieldPath: status.hostIP}}
+            - name: NODE_NAME
+              valueFrom: {fieldRef: {fieldPath: spec.nodeName}}
+            - {name: HOST_PROC, value: /host/proc}
+          ports:
+            - {name: metrics, containerPort: 9273}
+          volumeMounts:
+            - {name: config, mountPath: /etc/telegraf, readOnly: true}
+            - {name: host-proc, mountPath: /host/proc, readOnly: true}
+          readinessProbe:
+            httpGet: {path: /metrics, port: metrics}
+            periodSeconds: 10
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet: {path: /metrics, port: metrics}
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            timeoutSeconds: 3
+          resources:
+            requests: {cpu: 50m, memory: 96Mi}
+            limits: {cpu: 300m, memory: 256Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}
+      volumes:
+        - name: config
+          configMap: {name: telegraf-config}
+        - name: host-proc
+          hostPath: {path: /proc, type: Directory}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: telegraf
+spec:
+  type: ClusterIP
+  selector: {app: telegraf}
+  ports:
+    - {name: metrics, port: 9273, targetPort: metrics}
