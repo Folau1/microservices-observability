@@ -1,0 +1,6 @@
+fastapi==0.115.12
+uvicorn==0.34.2
+httpx==0.28.1
+boto3==1.38.18
+python-multipart==0.0.20
+prometheus-client==0.22.0

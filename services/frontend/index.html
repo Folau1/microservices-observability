@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Файловая лаборатория</title>
+  <style>
+    :root { color-scheme: light; font-family: system-ui, sans-serif; color: #17243b; background: #f2f5fa; }
+    * { box-sizing: border-box; }
+    body { margin: 0; }
+    header { background: #182b4d; color: white; padding: 26px max(24px, calc((100% - 1000px)/2)); }
+    header p { margin: 6px 0 0; color: #c6d3ea; }
+    h1 { margin: 0; font-size: 1.55rem; }
+    h2 { margin: 0 0 16px; font-size: 1.14rem; }
+    main { max-width: 1048px; margin: 28px auto; padding: 0 24px; display: grid; grid-template-columns: 1fr 1.5fr; gap: 20px; align-items: start; }
+    section { background: white; border: 1px solid #dce3ed; border-radius: 12px; padding: 22px; box-shadow: 0 4px 15px #17243b0a; }
+    label { display: block; font-weight: 600; font-size: .9rem; margin: 14px 0 6px; }
+    input { width: 100%; border: 1px solid #b8c6d8; border-radius: 7px; padding: 10px; font: inherit; }
+    input[type=file] { background: #f8fafc; }
+    button { background: #285bb5; color: white; border: 0; border-radius: 7px; padding: 10px 15px; font: inherit; font-weight: 600; cursor: pointer; }
+    button:hover { background: #20498f; }
+    button:disabled { opacity: .5; cursor: not-allowed; }
+    .secondary { background: #e8eef8; color: #244b89; }
+    .secondary:hover { background: #d8e4f6; }
+    .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 16px; }
+    .muted { color: #61718a; font-size: .9rem; line-height: 1.45; }
+    .row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+    ul { list-style: none; padding: 0; margin: 14px 0 0; }
+    li { border-top: 1px solid #e8edf4; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 0; overflow-wrap: anywhere; }
+    #status { grid-column: 1 / -1; white-space: pre-wrap; overflow-wrap: anywhere; min-height: 48px; margin: 0; font-size: .9rem; line-height: 1.5; }
+    .error { color: #a62929; }
+    @media (max-width: 700px) { main { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <header><h1>Файловая лаборатория</h1><p>Демонстрация микросервисов и объектного хранилища</p></header>
+  <main>
+    <section>
+      <h2>Авторизация</h2>
+      <p class="muted">Войдите с демонстрационной учётной записью, настроенной администратором стенда.</p>
+      <form id="login-form">
+        <label for="username">Имя пользователя</label><input id="username" autocomplete="username" required>
+        <label for="password">Пароль</label><input id="password" type="password" autocomplete="current-password" required>
+        <div class="actions"><button type="submit">Войти</button><button type="button" class="secondary" id="logout">Выйти</button></div>
+      </form>
+      <p id="auth-state" class="muted">Вы не вошли.</p>
+    </section>
+    <section>
+      <h2>Файлы</h2>
+      <p class="muted">Загрузите файл размером до 5 МБ. Для работы с файлами требуется вход.</p>
+      <form id="upload-form">
+        <label for="file">Выберите файл</label><input id="file" type="file" required>
+        <div class="actions"><button type="submit">Загрузить</button><button type="button" class="secondary" id="refresh">Обновить список</button></div>
+      </form>
+      <ul id="files" aria-label="Загруженные файлы"></ul>
+      <p id="empty" class="muted">Список пока не загружен.</p>
+    </section>
+    <section id="status" role="status" aria-live="polite">Готово к работе.</section>
+  </main>
+  <script>
+    (() => {
+      const $ = id => document.getElementById(id);
+      // The token is kept only in this page's memory and is cleared on reload.
+      let token = '';
+      const show = (message, error = false) => { $('status').textContent = message; $('status').classList.toggle('error', error); };
+      async function request(path, options = {}) {
+        const headers = new Headers(options.headers || {});
+        if (token) headers.set('Authorization', `Bearer ${token}`);
+        const response = await fetch(path, { ...options, headers });
+        if (!response.ok) {
+          let detail = await response.text();
+          try { const body = JSON.parse(detail); detail = typeof body.detail === 'string' ? body.detail : JSON.stringify(body); } catch (_) {}
+          throw new Error(`HTTP ${response.status}: ${detail || response.statusText}`);
+        }
+        return response;
+      }
+      function requireLogin() { if (!token) throw new Error('Сначала войдите в систему.'); }
+      async function refresh() {
+        requireLogin();
+        const response = await request('/api/uploader/files');
+        const data = await response.json();
+        const files = Array.isArray(data) ? data : data.files;
+        if (!Array.isArray(files)) throw new Error('Неожиданный формат списка файлов.');
+        $('files').replaceChildren();
+        $('empty').textContent = files.length ? '' : 'Файлов пока нет.';
+        for (const item of files) {
+          const name = item.filename;
+          const id = item.id;
+          if (typeof name !== 'string' || typeof id !== 'string') continue;
+          const li = document.createElement('li');
+          const label = document.createElement('span'); label.textContent = name;
+          const download = document.createElement('button'); download.type = 'button'; download.className = 'secondary'; download.textContent = 'Скачать';
+          download.addEventListener('click', async () => {
+            try {
+              requireLogin();
+              const result = await request(`/api/uploader/files/${encodeURIComponent(id)}`);
+              const url = URL.createObjectURL(await result.blob());
+              const link = document.createElement('a'); link.href = url; link.download = name; document.body.append(link); link.click(); link.remove();
+              setTimeout(() => URL.revokeObjectURL(url), 1000);
+              show(`Файл «${name}» скачан.`);
+            } catch (error) { show(error.message, true); }
+          });
+          li.append(label, download); $('files').append(li);
+        }
+        show(`Список обновлён. Файлов: ${files.length}.`);
+      }
+      $('login-form').addEventListener('submit', async event => {
+        event.preventDefault();
+        try {
+          const response = await request('/api/security/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: $('username').value, password: $('password').value }) });
+          const data = await response.json();
+          if (typeof data.access_token !== 'string' || !data.access_token) throw new Error('Сервер не вернул токен доступа.');
+          token = data.access_token; $('password').value = ''; $('auth-state').textContent = 'Вход выполнен.';
+          await refresh();
+        } catch (error) { show(error.message, true); }
+      });
+      $('logout').addEventListener('click', () => { token = ''; $('password').value = ''; $('auth-state').textContent = 'Вы не вошли.'; $('files').replaceChildren(); $('empty').textContent = 'Список пока не загружен.'; show('Вы вышли из системы.'); });
+      $('upload-form').addEventListener('submit', async event => {
+        event.preventDefault();
+        try {
+          requireLogin();
+          const file = $('file').files[0];
+          if (!file) throw new Error('Выберите файл.');
+          if (file.size > 5 * 1024 * 1024) throw new Error('Размер файла превышает 5 МБ.');
+          const body = new FormData(); body.append('file', file);
+          await request('/api/uploader/files', { method: 'POST', body });
+          $('upload-form').reset(); await refresh(); show(`Файл «${file.name}» загружен.`);
+        } catch (error) { show(error.message, true); }
+      });
+      $('refresh').addEventListener('click', async () => { try { await refresh(); } catch (error) { show(error.message, true); } });
+    })();
+  </script>
+</body>
+</html>

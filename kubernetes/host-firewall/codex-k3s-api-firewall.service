@@ -1,0 +1,12 @@
+[Unit]
+Description=Restrict Kubernetes API, kubelet and Flannel ingress for the microservices lab
+After=local-fs.target
+Before=k3s.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/codex-k3s-api-firewall
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
