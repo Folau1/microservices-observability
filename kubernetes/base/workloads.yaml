@@ -46,6 +46,11 @@ spec:
           readinessProbe:
             httpGet: {path: /minio/health/ready, port: api}
             periodSeconds: 10
+          startupProbe:
+            httpGet: {path: /minio/health/live, port: api}
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 36
           livenessProbe:
             httpGet: {path: /minio/health/live, port: api}
             initialDelaySeconds: 15
@@ -117,6 +122,11 @@ spec:
           readinessProbe:
             httpGet: {path: /health, port: http}
             periodSeconds: 5
+          startupProbe:
+            httpGet: {path: /health, port: http}
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 36
           livenessProbe:
             httpGet: {path: /health, port: http}
             initialDelaySeconds: 10
@@ -173,6 +183,11 @@ spec:
             httpGet: {path: /health/ready, port: http}
             periodSeconds: 5
             timeoutSeconds: 4
+          startupProbe:
+            httpGet: {path: /health/live, port: http}
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 36
           livenessProbe:
             httpGet: {path: /health/live, port: http}
             initialDelaySeconds: 10
