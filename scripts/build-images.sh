@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 # Requires Linux x86-64, Git, curl, sha256sum, tar, Docker, and network access.
 # The Go toolchain and caches are isolated in a temporary directory.
-# This source build has not yet been validated on the target cluster.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 archive=${1:-microservices-images.tar}
@@ -13,7 +12,8 @@ if [[ "$(uname -s)" != Linux || "$(uname -m)" != x86_64 ]]; then
   echo 'The pinned Go toolchain in this script requires Linux x86-64.' >&2
   exit 1
 fi
-for service in frontend security uploader; do
+docker build -t microservices-frontend:20261107-291fcc0 services/frontend
+for service in security uploader; do
   docker build -t "microservices-${service}:local" "services/${service}"
 done
 
@@ -66,7 +66,7 @@ DOCKERFILE
 # A local runtime context also works when the buildx plugin is absent.
 DOCKER_BUILDKIT=0 docker build -t microservices-minio:local "$minio_tmp/runtime"
 
-docker save -o "$archive" microservices-frontend:local microservices-security:local microservices-uploader:local microservices-minio:local
+docker save -o "$archive" microservices-frontend:20261107-291fcc0 microservices-security:local microservices-uploader:local microservices-minio:local
 echo "Archive: $archive"
 echo "After authorization, copy it over verified SSH and import on the K3s node:"
 echo "  sudo k3s ctr -n k8s.io images import /path/to/microservices-images.tar"

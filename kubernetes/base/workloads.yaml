@@ -213,7 +213,7 @@ spec:
       automountServiceAccountToken: false
       containers:
         - name: frontend
-          image: microservices-frontend:local
+          image: microservices-frontend:20261107-291fcc0
           imagePullPolicy: Never
           ports:
             - {name: http, containerPort: 8080}
