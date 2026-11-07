@@ -1,5 +1,5 @@
 [Unit]
-Description=Restrict Kubernetes API, kubelet and Flannel ingress for the microservices lab
+Description=Restrict Kubernetes API, kubelet and Flannel ingress for the microservices platform
 After=local-fs.target
 Before=k3s.service
 
