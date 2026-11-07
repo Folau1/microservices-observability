@@ -1,0 +1,34 @@
+tests:
+  - name: structured_request_keeps_allowlisted_fields
+    inputs:
+      - insert_at: safe_app_events
+        type: log
+        log_fields:
+          timestamp: "2026-11-07T16:00:00Z"
+          message: '{"service":"uploader","level":"INFO","request_id":"req-1","method":"GET","path":"/api/uploader/files","status":401,"password":"never-send"}'
+          kubernetes: {pod_name: uploader-123, pod_namespace: microservices, container_name: uploader, pod_node_name: node2, annotations: {token: never-send}}
+    outputs:
+      - extract_from: safe_app_events
+        conditions:
+          - type: vrl
+            source: |
+              assert_eq!(.service, "uploader")
+              assert_eq!(.request_id, "req-1")
+              assert_eq!(.status, 401)
+              assert_eq!(.kubernetes.pod_name, "uploader-123")
+              assert_eq!(.kubernetes.namespace_name, "microservices")
+              assert!(!exists(.password))
+              assert!(!exists(.message))
+              assert!(!exists(.kubernetes.annotations))
+  - name: unstructured_lines_are_not_sent
+    inputs:
+      - insert_at: safe_app_events
+        type: log
+        log_fields: {message: "token=never-send"}
+    no_outputs_from: [safe_app_events]
+  - name: unexpected_service_is_not_sent
+    inputs:
+      - insert_at: safe_app_events
+        type: log
+        log_fields: {message: '{"service":"other","token":"never-send"}'}
+    no_outputs_from: [safe_app_events]

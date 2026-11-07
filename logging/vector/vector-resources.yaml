@@ -1,0 +1,73 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: vector
+  namespace: logging
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: microservices-vector-read
+rules:
+  - apiGroups: [""]
+    resources: [pods, namespaces, nodes]
+    verbs: [list, watch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: microservices-vector-read
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: microservices-vector-read
+subjects:
+  - kind: ServiceAccount
+    name: vector
+    namespace: logging
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: vector
+  namespace: logging
+spec:
+  selector:
+    matchLabels: {app: vector}
+  template:
+    metadata:
+      labels: {app: vector}
+    spec:
+      serviceAccountName: vector
+      nodeSelector: {kubernetes.io/hostname: node2}
+      terminationGracePeriodSeconds: 60
+      containers:
+        - name: vector
+          image: ghcr.io/vectordotdev/vector:0.61.0-distroless-libc@sha256:9fc0692b59d35c97fb5af4d2de6a5b008c23addee3e6a0668ce70acdbc955b1f
+          args: ["--config", "/etc/vector/config/vector.yaml"]
+          resources:
+            requests: {cpu: 50m, memory: 64Mi}
+            limits: {cpu: 500m, memory: 256Mi}
+          securityContext:
+            runAsUser: 0
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}
+            seccompProfile: {type: RuntimeDefault}
+          volumeMounts:
+            - {name: config, mountPath: /etc/vector/config, readOnly: true}
+            - {name: auth, mountPath: /etc/vector/auth, readOnly: true}
+            - {name: ca, mountPath: /etc/vector/ca, readOnly: true}
+            - {name: pod-logs, mountPath: /var/log/pods, readOnly: true}
+            - {name: data, mountPath: /var/lib/vector}
+      volumes:
+        - name: config
+          configMap: {name: vector-config}
+        - name: auth
+          secret: {secretName: vector-auth, defaultMode: 0400}
+        - name: ca
+          secret: {secretName: elasticsearch-http-ca, defaultMode: 0444}
+        - name: pod-logs
+          hostPath: {path: /var/log/pods, type: Directory}
+        - name: data
+          hostPath: {path: /var/lib/codex-elasticsearch/vector, type: Directory}

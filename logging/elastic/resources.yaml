@@ -1,0 +1,143 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: elasticsearch-config
+data:
+  elasticsearch.yml: |
+    cluster.name: microservices-logging
+    node.name: elasticsearch-0
+    network.host: 0.0.0.0
+    discovery.type: single-node
+    xpack.security.enabled: true
+    xpack.security.autoconfiguration.enabled: false
+    xpack.security.http.ssl.enabled: true
+    xpack.security.http.ssl.key: certs/tls.key
+    xpack.security.http.ssl.certificate: certs/tls.crt
+    xpack.security.transport.ssl.enabled: true
+    xpack.security.transport.ssl.verification_mode: full
+    xpack.security.transport.ssl.key: certs/tls.key
+    xpack.security.transport.ssl.certificate: certs/tls.crt
+    xpack.security.transport.ssl.certificate_authorities: [certs/ca.crt]
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: logging-elasticsearch-node2
+spec:
+  capacity: {storage: 4Gi}
+  accessModes: [ReadWriteOnce]
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: ''
+  claimRef: {namespace: logging, name: elasticsearch-data}
+  local: {path: /var/lib/codex-elasticsearch/data}
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - {key: kubernetes.io/hostname, operator: In, values: [node2]}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: elasticsearch-data
+spec:
+  storageClassName: ''
+  volumeName: logging-elasticsearch-node2
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests: {storage: 4Gi}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: elasticsearch
+spec:
+  type: ClusterIP
+  selector: {app: elasticsearch}
+  ports:
+    - {name: https, port: 9200, targetPort: https}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: elasticsearch-clients
+spec:
+  podSelector:
+    matchLabels: {app: elasticsearch}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - podSelector: {matchLabels: {app: vector}}
+        - podSelector: {matchLabels: {app: kibana}}
+      ports:
+        - {protocol: TCP, port: 9200}
+  egress: []
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: elasticsearch
+spec:
+  serviceName: elasticsearch
+  replicas: 1
+  selector:
+    matchLabels: {app: elasticsearch}
+  template:
+    metadata:
+      labels: {app: elasticsearch}
+    spec:
+      automountServiceAccountToken: false
+      nodeSelector: {kubernetes.io/hostname: node2}
+      terminationGracePeriodSeconds: 90
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 0
+        fsGroup: 0
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: elasticsearch
+          image: docker.elastic.co/elasticsearch/elasticsearch:9.5.6@sha256:79b4f1de4c15e6eca824723086a51e5934406d614d410cc11be77748cafac537
+          imagePullPolicy: IfNotPresent
+          env:
+            - {name: ES_JAVA_OPTS, value: '-Xms512m -Xmx512m'}
+            - {name: ELASTIC_PASSWORD_FILE, value: /usr/share/elasticsearch/config/auth/password}
+          ports:
+            - {name: https, containerPort: 9200}
+          startupProbe:
+            exec:
+              command: [/bin/bash, -c, 'curl --config /usr/share/elasticsearch/config/auth/curl.conf --silent --fail --max-time 5 https://127.0.0.1:9200/ >/dev/null']
+            periodSeconds: 10
+            failureThreshold: 60
+            timeoutSeconds: 7
+          readinessProbe:
+            exec:
+              command: [/bin/bash, -c, 'curl --config /usr/share/elasticsearch/config/auth/curl.conf --silent --fail --max-time 5 https://127.0.0.1:9200/ >/dev/null']
+            periodSeconds: 10
+            timeoutSeconds: 7
+          livenessProbe:
+            exec:
+              command: [/bin/bash, -c, 'curl --config /usr/share/elasticsearch/config/auth/curl.conf --silent --fail --max-time 5 https://127.0.0.1:9200/ >/dev/null']
+            periodSeconds: 30
+            failureThreshold: 5
+            timeoutSeconds: 7
+          resources:
+            requests: {cpu: 250m, memory: 1Gi}
+            limits: {cpu: '1', memory: 1536Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: {drop: [ALL]}
+          volumeMounts:
+            - {name: config, mountPath: /usr/share/elasticsearch/config/elasticsearch.yml, subPath: elasticsearch.yml, readOnly: true}
+            - {name: tls, mountPath: /usr/share/elasticsearch/config/certs, readOnly: true}
+            - {name: auth, mountPath: /usr/share/elasticsearch/config/auth, readOnly: true}
+            - {name: data, mountPath: /usr/share/elasticsearch/data}
+      volumes:
+        - name: config
+          configMap: {name: elasticsearch-config}
+        - name: tls
+          secret: {secretName: elasticsearch-tls, defaultMode: 288}
+        - name: auth
+          secret: {secretName: elasticsearch-admin, defaultMode: 288}
+        - name: data
+          persistentVolumeClaim: {claimName: elasticsearch-data}

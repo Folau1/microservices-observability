@@ -1,0 +1,65 @@
+data_dir: /var/lib/vector
+
+secret:
+  auth:
+    type: directory
+    path: /etc/vector/auth
+    remove_trailing_whitespace: true
+
+sources:
+  application_logs:
+    type: kubernetes_logs
+    self_node_name: node2
+    extra_namespace_label_selector: kubernetes.io/metadata.name=microservices
+    extra_label_selector: "app in (security,uploader)"
+    read_from: beginning
+
+transforms:
+  safe_app_events:
+    type: remap
+    inputs: [application_logs]
+    drop_on_abort: true
+    drop_on_error: true
+    source: |
+      parsed, err = parse_json(.message)
+      if err != null || !is_object(parsed) { abort }
+      if !includes(["security", "uploader"], parsed.service) { abort }
+      . = {
+        "timestamp": .timestamp,
+        "service": parsed.service,
+        "level": parsed.level,
+        "request_id": parsed.request_id,
+        "method": parsed.method,
+        "path": parsed.path,
+        "status": parsed.status,
+        "kubernetes": {
+          "pod_name": .kubernetes.pod_name,
+          "namespace_name": .kubernetes.pod_namespace,
+          "container_name": .kubernetes.container_name,
+          "pod_node_name": .kubernetes.pod_node_name
+        }
+      }
+
+sinks:
+  elasticsearch:
+    type: elasticsearch
+    inputs: [safe_app_events]
+    endpoints: ["https://elasticsearch.logging.svc:9200"]
+    mode: data_stream
+    data_stream:
+      type: logs
+      dataset: microservices
+      namespace: default
+      auto_routing: false
+    auth:
+      strategy: basic
+      user: "SECRET[auth.username]"
+      password: "SECRET[auth.password]"
+    tls:
+      ca_file: /etc/vector/ca/ca.crt
+      verify_certificate: true
+      verify_hostname: true
+    buffer:
+      type: disk
+      max_size: 536870912
+      when_full: block

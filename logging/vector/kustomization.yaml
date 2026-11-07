@@ -1,0 +1,9 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: logging
+resources:
+  - vector-resources.yaml
+configMapGenerator:
+  - name: vector-config
+    files:
+      - vector.yaml

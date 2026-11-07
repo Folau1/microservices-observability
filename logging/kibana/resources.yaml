@@ -1,0 +1,89 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kibana
+  labels: {app: kibana}
+spec:
+  replicas: 1
+  strategy: {type: Recreate}
+  selector:
+    matchLabels: {app: kibana}
+  template:
+    metadata:
+      labels: {app: kibana}
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: kibana
+          image: docker.elastic.co/kibana/kibana:9.5.6
+          ports:
+            - {name: http, containerPort: 5601}
+          startupProbe:
+            httpGet: {path: /login, port: http}
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 90
+          readinessProbe:
+            httpGet: {path: /login, port: http}
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            httpGet: {path: /login, port: http}
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 4
+          resources:
+            requests: {cpu: 100m, memory: 768Mi, ephemeral-storage: 128Mi}
+            limits: {cpu: '1', memory: 1Gi, ephemeral-storage: 512Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: {drop: [ALL]}
+          volumeMounts:
+            - name: config
+              mountPath: /usr/share/kibana/config/kibana.yml
+              subPath: kibana.yml
+              readOnly: true
+            - name: es-ca
+              mountPath: /usr/share/kibana/config/es-ca
+              readOnly: true
+            - name: data
+              mountPath: /usr/share/kibana/data
+      volumes:
+        - name: config
+          secret:
+            secretName: kibana-config
+            defaultMode: 0440
+        - name: es-ca
+          secret:
+            secretName: elasticsearch-http-ca
+            defaultMode: 0440
+        - name: data
+          emptyDir: {sizeLimit: 128Mi}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kibana
+  labels: {app: kibana}
+spec:
+  type: ClusterIP
+  selector: {app: kibana}
+  ports:
+    - {name: http, port: 5601, targetPort: http}
+---
+# No Pod-to-Pod ingress. Kubelet health checks and kubectl port-forward must
+# be verified on this K3s version/CNI; no externally exposed NodePort/Ingress.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: kibana-no-pod-ingress
+spec:
+  podSelector:
+    matchLabels: {app: kibana}
+  policyTypes: [Ingress]
+  ingress: []

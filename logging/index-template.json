@@ -1,0 +1,34 @@
+{
+  "index_patterns": ["logs-microservices-*"],
+  "priority": 501,
+  "data_stream": {},
+  "template": {
+    "settings": {
+      "index": {
+        "lifecycle": {"name": "microservices-3d"},
+        "number_of_shards": 1,
+        "number_of_replicas": 0
+      }
+    },
+    "mappings": {
+      "dynamic": false,
+      "properties": {
+        "@timestamp": {"type": "date"},
+        "service": {"type": "keyword"},
+        "level": {"type": "keyword"},
+        "request_id": {"type": "keyword"},
+        "message": {"type": "text"},
+        "method": {"type": "keyword"},
+        "path": {"type": "keyword"},
+        "status": {"type": "integer"},
+        "kubernetes": {
+          "properties": {
+            "namespace_name": {"type": "keyword"},
+            "pod_name": {"type": "keyword"},
+            "container_name": {"type": "keyword"}
+          }
+        }
+      }
+    }
+  }
+}
