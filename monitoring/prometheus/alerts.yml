@@ -3,13 +3,16 @@ groups:
     interval: 15s
     rules:
       - alert: AppServiceDown
-        expr: up{job="apps"} == 0
+        expr: |
+          (max by (service) (up{job="apps"}) == 0)
+          or max by (service) (absent(up{job="apps", service="security"}))
+          or max by (service) (absent(up{job="apps", service="uploader"}))
         for: 30s
         labels:
           severity: warning
         annotations:
-          summary: 'Application metrics endpoint unavailable'
-          description: 'Prometheus cannot scrape {{ $labels.service }} at {{ $labels.instance }} for 30 seconds.'
+          summary: 'No available application metrics target'
+          description: 'No metrics target is reachable for {{ $labels.service }}, or discovery failed.'
   - name: filesystem-health
     interval: 15s
     rules:

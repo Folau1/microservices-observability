@@ -17,10 +17,30 @@ data:
       - job_name: telegraf
         static_configs:
           - targets: ['telegraf.observability.svc.cluster.local:9273']
-      # Static service targets survive Pod recreation: absent endpoints become up=0.
       - job_name: apps
-        static_configs:
-          - targets: ['security.microservices.svc.cluster.local:8000']
-            labels: {service: security}
-          - targets: ['uploader.microservices.svc.cluster.local:8000']
-            labels: {service: uploader}
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              names: [microservices]
+            selectors:
+              - role: pod
+                label: 'app in (security,uploader)'
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_phase]
+            action: keep
+            regex: Running
+          - source_labels: [__meta_kubernetes_pod_ready]
+            action: keep
+            regex: 'true'
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+            action: keep
+            regex: 'true'
+          - source_labels: [__meta_kubernetes_pod_label_app, __meta_kubernetes_pod_container_name, __meta_kubernetes_pod_container_port_name]
+            action: keep
+            regex: '(security;security;http|uploader;uploader;http)'
+          - source_labels: [__meta_kubernetes_pod_label_app]
+            target_label: service
+          - source_labels: [__meta_kubernetes_pod_name]
+            target_label: pod
+          - source_labels: [__meta_kubernetes_namespace]
+            target_label: namespace

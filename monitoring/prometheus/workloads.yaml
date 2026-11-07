@@ -1,4 +1,10 @@
 apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: prometheus-pod-discovery
+automountServiceAccountToken: false
+---
+apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: prometheus-data
@@ -21,7 +27,8 @@ spec:
     metadata:
       labels: {app: prometheus}
     spec:
-      automountServiceAccountToken: false
+      serviceAccountName: prometheus-pod-discovery
+      automountServiceAccountToken: true
       securityContext:
         runAsNonRoot: true
         runAsUser: 65534

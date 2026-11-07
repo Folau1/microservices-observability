@@ -7,14 +7,16 @@ tests:
     input_series:
       - series: 'up{job="apps",service="security",instance="security:8000"}'
         values: '0+0x24'
+      - series: 'up{job="apps",service="uploader",instance="uploader:8000"}'
+        values: '1+0x24'
     alert_rule_test:
       - eval_time: 1m
         alertname: AppServiceDown
         exp_alerts:
-          - exp_labels: {job: apps, service: security, instance: 'security:8000', severity: warning}
+          - exp_labels: {service: security, severity: warning}
             exp_annotations:
-              summary: 'Application metrics endpoint unavailable'
-              description: 'Prometheus cannot scrape security at security:8000 for 30 seconds.'
+              summary: 'No available application metrics target'
+              description: 'No metrics target is reachable for security, or discovery failed.'
   - name: healthy_filesystems
     interval: 15s
     input_series:
@@ -101,3 +103,112 @@ tests:
         exp_alerts:
           - exp_labels: {severity: warning}
             exp_annotations: {summary: 'Нет метрик тома логирования'}
+  - name: both_services_healthy
+    interval: 15s
+    input_series:
+      - series: 'up{job="apps",service="security",pod="security-a"}'
+        values: '1+0x8'
+      - series: 'up{job="apps",service="uploader",pod="uploader-a"}'
+        values: '1+0x8'
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: AppServiceDown
+        exp_alerts: []
+  - name: one_security_replica_still_healthy
+    interval: 15s
+    input_series:
+      - series: 'up{job="apps",service="security",pod="security-a"}'
+        values: '0+0x8'
+      - series: 'up{job="apps",service="security",pod="security-b"}'
+        values: '1+0x8'
+      - series: 'up{job="apps",service="uploader",pod="uploader-a"}'
+        values: '1+0x8'
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: AppServiceDown
+        exp_alerts: []
+  - name: all_security_targets_down
+    interval: 15s
+    input_series:
+      - series: 'up{job="apps",service="security",pod="security-a"}'
+        values: '0+0x8'
+      - series: 'up{job="apps",service="uploader",pod="uploader-a"}'
+        values: '1+0x8'
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: AppServiceDown
+        exp_alerts:
+          - exp_labels:
+              service: security
+              severity: warning
+            exp_annotations:
+              summary: 'No available application metrics target'
+              description: 'No metrics target is reachable for security, or discovery failed.'
+  - name: missing_security_target
+    interval: 15s
+    input_series:
+      - series: 'up{job="apps",service="uploader",pod="uploader-a"}'
+        values: '1+0x8'
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: AppServiceDown
+        exp_alerts:
+          - exp_labels:
+              service: security
+              severity: warning
+            exp_annotations:
+              summary: 'No available application metrics target'
+              description: 'No metrics target is reachable for security, or discovery failed.'
+  - name: both_targets_absent
+    interval: 15s
+    input_series: []
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: AppServiceDown
+        exp_alerts:
+          - exp_labels:
+              service: security
+              severity: warning
+            exp_annotations:
+              summary: 'No available application metrics target'
+              description: 'No metrics target is reachable for security, or discovery failed.'
+          - exp_labels:
+              service: uploader
+              severity: warning
+            exp_annotations:
+              summary: 'No available application metrics target'
+              description: 'No metrics target is reachable for uploader, or discovery failed.'
+  - name: alert_identity_survives_down_target_disappearance
+    interval: 15s
+    input_series:
+      - series: 'up{job="apps",service="security",pod="security-a"}'
+        values: '0 0 stale _ _ _ _ _ _'
+      - series: 'up{job="apps",service="uploader",pod="uploader-a"}'
+        values: '1+0x8'
+    alert_rule_test:
+      - eval_time: 30s
+        alertname: AppServiceDown
+        exp_alerts:
+          - exp_labels:
+              service: security
+              severity: warning
+            exp_annotations:
+              summary: 'No available application metrics target'
+              description: 'No metrics target is reachable for security, or discovery failed.'
+  - name: synthetic_target_fires_without_stopping_apps
+    interval: 15s
+    input_series:
+      - series: 'up{job="apps",service="security",pod="security-a"}'
+        values: '1+0x8'
+      - series: 'up{job="apps",service="uploader",pod="uploader-a"}'
+        values: '1+0x8'
+      - series: 'up{job="apps",service="controlled-alert-test",pod="controlled-alert-test"}'
+        values: '0+0x8'
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: AppServiceDown
+        exp_alerts:
+          - exp_labels: {service: controlled-alert-test, severity: warning}
+            exp_annotations:
+              summary: 'No available application metrics target'
+              description: 'No metrics target is reachable for controlled-alert-test, or discovery failed.'
