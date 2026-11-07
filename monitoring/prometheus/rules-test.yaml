@@ -1,0 +1,103 @@
+rule_files:
+  - alerts.yml
+evaluation_interval: 15s
+tests:
+  - name: existing_app_alert_is_preserved
+    interval: 15s
+    input_series:
+      - series: 'up{job="apps",service="security",instance="security:8000"}'
+        values: '0+0x24'
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: AppServiceDown
+        exp_alerts:
+          - exp_labels: {job: apps, service: security, instance: 'security:8000', severity: warning}
+            exp_annotations:
+              summary: 'Application metrics endpoint unavailable'
+              description: 'Prometheus cannot scrape security at security:8000 for 30 seconds.'
+  - name: healthy_filesystems
+    interval: 15s
+    input_series:
+      - series: 'kubernetes_node_fs_available_bytes{host="node2"}'
+        values: '50+0x24'
+      - series: 'kubernetes_node_fs_capacity_bytes{host="node2"}'
+        values: '100+0x24'
+      - series: 'logging_volume_mount_present{host="node2"}'
+        values: '1+0x24'
+      - series: 'logging_volume_available_bytes{host="node2"}'
+        values: '50+0x24'
+      - series: 'logging_volume_capacity_bytes{host="node2"}'
+        values: '100+0x24'
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: LoggingVolumeMissing
+        exp_alerts: []
+      - eval_time: 3m
+        alertname: RootFilesystemLowSpace
+        exp_alerts: []
+      - eval_time: 3m
+        alertname: LoggingVolumeLowSpace
+        exp_alerts: []
+  - name: missing_volume
+    interval: 15s
+    input_series:
+      - series: 'logging_volume_mount_present{host="node2"}'
+        values: '0+0x24'
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: LoggingVolumeMissing
+        exp_alerts:
+          - exp_labels: {host: node2, severity: critical}
+            exp_annotations: {summary: 'Не обнаружен ожидаемый том логирования'}
+  - name: low_space
+    interval: 15s
+    input_series:
+      - series: 'kubernetes_node_fs_available_bytes{host="node2"}'
+        values: '10+0x24'
+      - series: 'kubernetes_node_fs_capacity_bytes{host="node2"}'
+        values: '100+0x24'
+      - series: 'logging_volume_mount_present{host="node2"}'
+        values: '1+0x24'
+      - series: 'logging_volume_available_bytes{host="node2"}'
+        values: '10+0x24'
+      - series: 'logging_volume_capacity_bytes{host="node2"}'
+        values: '100+0x24'
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: RootFilesystemLowSpace
+        exp_alerts:
+          - exp_labels: {host: node2, severity: warning}
+            exp_annotations: {summary: 'На корневой файловой системе осталось менее 15%'}
+      - eval_time: 3m
+        alertname: LoggingVolumeLowSpace
+        exp_alerts:
+          - exp_labels: {host: node2, severity: warning}
+            exp_annotations: {summary: 'На томе логирования осталось менее 20%'}
+  - name: restored_mount_resolves_alert
+    interval: 15s
+    input_series:
+      - series: 'logging_volume_mount_present{host="node2"}'
+        values: '0+0x8 1+0x16'
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: LoggingVolumeMissing
+        exp_alerts:
+          - exp_labels: {host: node2, severity: critical}
+            exp_annotations: {summary: 'Не обнаружен ожидаемый том логирования'}
+      - eval_time: 3m
+        alertname: LoggingVolumeMissing
+        exp_alerts: []
+  - name: missing_metrics
+    interval: 15s
+    input_series: []
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: RootFilesystemMetricsMissing
+        exp_alerts:
+          - exp_labels: {severity: warning}
+            exp_annotations: {summary: 'Нет метрик корневой файловой системы'}
+      - eval_time: 6m
+        alertname: LoggingVolumeMetricsMissing
+        exp_alerts:
+          - exp_labels: {severity: warning}
+            exp_annotations: {summary: 'Нет метрик тома логирования'}

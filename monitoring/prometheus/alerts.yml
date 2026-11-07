@@ -1,0 +1,45 @@
+groups:
+  - name: application-availability
+    interval: 15s
+    rules:
+      - alert: AppServiceDown
+        expr: up{job="apps"} == 0
+        for: 30s
+        labels:
+          severity: warning
+        annotations:
+          summary: 'Application metrics endpoint unavailable'
+          description: 'Prometheus cannot scrape {{ $labels.service }} at {{ $labels.instance }} for 30 seconds.'
+  - name: filesystem-health
+    interval: 15s
+    rules:
+      - alert: RootFilesystemLowSpace
+        expr: 100 * kubernetes_node_fs_available_bytes / kubernetes_node_fs_capacity_bytes < 15
+        for: 2m
+        labels: {severity: warning}
+        annotations:
+          summary: 'На корневой файловой системе осталось менее 15%'
+      - alert: RootFilesystemMetricsMissing
+        expr: absent_over_time(kubernetes_node_fs_available_bytes[3m]) or absent_over_time(kubernetes_node_fs_capacity_bytes[3m])
+        for: 2m
+        labels: {severity: warning}
+        annotations:
+          summary: 'Нет метрик корневой файловой системы'
+      - alert: LoggingVolumeMissing
+        expr: logging_volume_mount_present == 0
+        for: 30s
+        labels: {severity: critical}
+        annotations:
+          summary: 'Не обнаружен ожидаемый том логирования'
+      - alert: LoggingVolumeMetricsMissing
+        expr: absent_over_time(logging_volume_mount_present[3m]) or absent_over_time(logging_volume_available_bytes[3m]) or absent_over_time(logging_volume_capacity_bytes[3m])
+        for: 2m
+        labels: {severity: warning}
+        annotations:
+          summary: 'Нет метрик тома логирования'
+      - alert: LoggingVolumeLowSpace
+        expr: 100 * logging_volume_available_bytes / logging_volume_capacity_bytes < 20
+        for: 2m
+        labels: {severity: warning}
+        annotations:
+          summary: 'На томе логирования осталось менее 20%'

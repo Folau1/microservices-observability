@@ -24,16 +24,3 @@ data:
             labels: {service: security}
           - targets: ['uploader.microservices.svc.cluster.local:8000']
             labels: {service: uploader}
-  alerts.yml: |
-    groups:
-      - name: application-availability
-        interval: 15s
-        rules:
-          - alert: AppServiceDown
-            expr: up{job="apps"} == 0
-            for: 30s
-            labels:
-              severity: warning
-            annotations:
-              summary: 'Application metrics endpoint unavailable'
-              description: 'Prometheus cannot scrape {{ $labels.service }} at {{ $labels.instance }} for 30 seconds.'

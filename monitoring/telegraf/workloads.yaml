@@ -46,7 +46,7 @@ spec:
       containers:
         - name: telegraf
           image: telegraf:1.40.2
-          args: ['--config', '/etc/telegraf/telegraf.conf']
+          args: ['--config', '/etc/telegraf/telegraf.conf', '--config-directory', '/etc/telegraf/logging-volume']
           env:
             - name: NODE_IP
               valueFrom: {fieldRef: {fieldPath: status.hostIP}}
@@ -58,6 +58,9 @@ spec:
           volumeMounts:
             - {name: config, mountPath: /etc/telegraf, readOnly: true}
             - {name: host-proc, mountPath: /host/proc, readOnly: true}
+            - {name: logging-volume-check, mountPath: /etc/telegraf/logging-volume, readOnly: true}
+            - {name: logging-volume-identity, mountPath: /etc/telegraf/logging-volume-identity, readOnly: true}
+            - {name: logging-volume-data, mountPath: /host/logging-volume, readOnly: true}
           readinessProbe:
             httpGet: {path: /metrics, port: metrics}
             periodSeconds: 10
@@ -84,6 +87,12 @@ spec:
           configMap: {name: telegraf-config}
         - name: host-proc
           hostPath: {path: /proc, type: Directory}
+        - name: logging-volume-check
+          configMap: {name: logging-volume-check}
+        - name: logging-volume-identity
+          secret: {secretName: logging-volume-identity, optional: true, defaultMode: 0444}
+        - name: logging-volume-data
+          hostPath: {path: /var/lib/codex-elasticsearch, type: Directory}
 ---
 apiVersion: v1
 kind: Service

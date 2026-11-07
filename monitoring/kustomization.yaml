@@ -7,3 +7,12 @@ resources:
   - prometheus/workloads.yaml
   - telegraf/config.yaml
   - telegraf/workloads.yaml
+configMapGenerator:
+  - name: prometheus-config
+    behavior: merge
+    files:
+      - prometheus/alerts.yml
+  - name: logging-volume-check
+    files:
+      - telegraf/logging-volume.conf
+      - telegraf/check-logging-volume.sh
