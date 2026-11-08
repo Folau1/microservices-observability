@@ -6,3 +6,4 @@ resources:
   - config.yaml
   - workloads.yaml
   - ingress.yaml
+  - security-hpa.yaml

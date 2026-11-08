@@ -94,7 +94,6 @@ kind: Deployment
 metadata:
   name: security
 spec:
-  replicas: 1
   selector:
     matchLabels: {app: security}
   template:

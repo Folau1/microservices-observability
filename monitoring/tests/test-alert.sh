@@ -141,7 +141,7 @@ if target in original:
 pattern=r"(?m)^([ ]*)-[ ]+job_name:[ ]*['\"]?apps['\"]?[ ]*\n\1  static_configs:[ ]*\n"
 matches=list(re.finditer(pattern, original))
 if len(matches)!=1:
-    raise SystemExit("Expected exactly one static apps scrape job; refusing to change configuration.")
+    raise SystemExit("This live test requires the earlier static apps job; Pod discovery is not supported. Use promtool test rules instead.")
 m=matches[0]; indent=m.group(1)
 item=f"{indent}    - targets: ['127.0.0.1:1']\n{indent}      labels: {{service: {target}}}\n"
 staged=original[:m.end()]+item+original[m.end():]
